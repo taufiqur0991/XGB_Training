@@ -5,6 +5,7 @@ import joblib
 import mplfinance as mpf
 from ta.momentum import RSIIndicator
 from ta.trend import EMAIndicator
+import matplotlib.pyplot as plt
 
 # =====================================================
 # CONFIGURATION
@@ -25,7 +26,7 @@ os.makedirs(OUTPUT_BASE, exist_ok=True)
 
 def get_pair_params(filename):
     if "XAUUSD" in filename.upper():
-        return 0.01, 1, 100, 150 # Gold parameters SL 100 & TP 150 pips
+        return 0.01, 1, 10, 15 # Gold parameters SL 10 & TP 15 pips
     return 0.00001, 10000, 10, 15 # Forex parameters SL 10 & TP 15 pips
 
 # Mencari file CSV di semua sub-folder
@@ -126,36 +127,65 @@ for full_path in csv_files_full_path:
     print(f"\n=== RESULT FOR {pair_name} ===")
     if len(trades) > 0:
         current_balance = INITIAL_BALANCE
-        equity_curve = []
-        for _, row in trades.iterrows():
-            #risk_usd = current_balance * RISK_PER_TRADE
-            #lot = risk_usd / (SL_PIPS * PIP_VALUE)
-            lot = FIXED_LOT
-            profit = row['result_pips'] * PIP_VALUE * lot
-            current_balance += profit
-            equity_curve.append(current_balance)
+        equity_list = [INITIAL_BALANCE]
+        balance_list = [INITIAL_BALANCE]
+        # Gunakan waktu awal data sebagai titik nol
+        time_list = [df.index[0]] 
         
-        equity = np.array(equity_curve)
-        peak = equity[0]
-        drawdowns = []
+        for idx, row in trades.iterrows():
+            lot = FIXED_LOT
+            pips = row['result_pips']
+            profit = pips * PIP_VALUE * lot
+            
+            # Simulasi Equity (spike) vs Balance (garis lurus)
+            # Dalam MT5, Equity turun dulu saat floating, baru balance update saat close
+            current_balance += profit
+            
+            balance_list.append(current_balance)
+            equity_list.append(current_balance) # Untuk simulasi sederhana
+            time_list.append(idx)
+        
+        balance_arr = np.array(balance_list)
+        peak = np.maximum.accumulate(balance_arr)
+        drawdown_pct = (peak - balance_arr) / peak
 
-        for value in equity:
-            if value > peak:
-                peak = value
-            drawdowns.append((peak - value) / peak)
+        # --- PLOTTING ---
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), 
+                                       gridspec_kw={'height_ratios': [3, 1]}, sharex=True)
+        
+        # Plot 1: Balance (Biru) & Drawdown Spikes (Hijau)
+        # Sumbu X: time_list, Sumbu Y: balance_arr -> Panjangnya sekarang PASTI sama
+        ax1.plot(time_list, balance_arr, color='#0000FF', label='Balance', linewidth=1.5)
+        
+        # Simulasi spike drawdown hijau seperti di gambar
+        # Kita buat garis vertikal tipis untuk setiap trade yang rugi
+        for i in range(len(balance_list)):
+            if i > 0 and balance_list[i] < balance_list[i-1]:
+                ax1.vlines(time_list[i], balance_list[i], balance_list[i-1], color='#008000', alpha=0.7)
 
+        ax1.set_title(f"Strategy Tester: {pair_name}", fontsize=12, loc='left')
+        ax1.set_ylabel("Value")
+        ax1.grid(True, which='both', linestyle='--', alpha=0.5)
+        ax1.legend(loc='upper left')
+
+        # Plot 2: Drawdown / Deposit Load (Hijau Bawah)
+        ax2.fill_between(time_list, drawdown_pct * 100, 0, color='#00FF00', alpha=0.6)
+        ax2.set_ylabel("Drawdown %")
+        ax2.set_ylim(0, max(drawdown_pct * 100) * 1.5 if max(drawdown_pct) > 0 else 5)
+        ax2.grid(True, linestyle='--', alpha=0.5)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(OUTPUT_BASE, f"Chart_{pair_name}.png"))
+        
+        # Output text tetap sama
         print(f"Total Trades    : {len(trades)}")
         print(f"Total Pips      : {round(trades['result_pips'].sum(), 2)}")
         print(f"Winrate         : {round((trades['result_pips'] > 0).mean() * 100, 2)} %")
-        
         print("\n=== BALANCE SIMULATION ===")
-        print("Initial Balance :", INITIAL_BALANCE)
-        print("Final Balance   :", round(current_balance, 2))
-        print("Net Profit      :", round(current_balance - INITIAL_BALANCE, 2))
-        print("Max Drawdown    :", round(max(drawdowns) * 100, 2), "%")
-        print("Return %        :", round((current_balance / INITIAL_BALANCE - 1) * 100, 2), "%")
-    else:
-        print("No trades found.")
+        print(f"Initial Balance : {INITIAL_BALANCE}")
+        print(f"Final Balance   : {round(current_balance, 2)}")
+        print(f"Net Profit      : {round(current_balance - INITIAL_BALANCE, 2)}")
+        print(f"Max Drawdown    : {round(max(drawdown_pct) * 100, 2)} %")
 
     # 6. RANDOM SCREENSHOTS
     if len(trades) > 0:

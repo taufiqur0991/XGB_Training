@@ -55,9 +55,9 @@ def train_pair(pair_name):
 
     # 3. Model XGBoost (Mode Binary seperti Kode 1)
     model = xgb.XGBClassifier(
-        n_estimators=500, # Tambah estimator agar lebih kuat menghafal
-        max_depth=7,      # Lebih dalam agar lebih detail menghafalnya
-        learning_rate=0.05,
+        n_estimators=1000, # Tambah estimator agar lebih kuat menghafal
+        max_depth=10,      # Lebih dalam agar lebih detail menghafalnya
+        learning_rate=0.01,
         subsample=0.9,
         colsample_bytree=0.9,
         eval_metric='logloss'
