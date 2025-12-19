@@ -25,8 +25,8 @@ os.makedirs(OUTPUT_BASE, exist_ok=True)
 
 def get_pair_params(filename):
     if "XAUUSD" in filename.upper():
-        return 0.01, 1, 100, 150
-    return 0.00001, 10000, 10, 15
+        return 0.01, 1, 100, 150 # Gold parameters SL 100 & TP 150 pips
+    return 0.00001, 10000, 10, 15 # Forex parameters SL 10 & TP 15 pips
 
 # Mencari file CSV di semua sub-folder
 csv_files_full_path = []
